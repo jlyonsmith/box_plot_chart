@@ -11,10 +11,13 @@ categories = ["command-line-utilities", "development-tools"]
 license = "Unlicense"
 
 [dependencies]
+chrono = { version = "0.4.23", features = ["serde"] }
 clap = { version = "3.0.14", features = ["derive"] }
 colored = "^2.0.0"
+csv = "1.1.6"
 hypermelon = "0.4.0"
 lazy_static = "1.4.0"
+serde = { version = "1.0.152", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "^0.3"
