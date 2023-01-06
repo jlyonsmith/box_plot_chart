@@ -1,9 +1,11 @@
 mod log_macros;
 mod quartile;
 
+use chrono::NaiveDate;
 use clap::Parser;
 use core::fmt::Arguments;
 use quartile::Quartile;
+use serde::Deserialize;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -26,6 +28,19 @@ struct Cli {
 
     #[clap(value_name = "OUTPUT_FILE")]
     output_file: PathBuf,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChartData {
+    pub title: String,
+    pub units: String,
+    pub data: Vec<ItemData>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ItemData {
+    pub key: String,
+    pub data: Vec<f32>,
 }
 
 impl<'a> BoxPlotChartTool<'a> {
