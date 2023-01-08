@@ -2,20 +2,20 @@ use std::error::Error;
 
 #[derive(Debug, PartialEq)]
 pub struct Quartile {
-    lower_outliers: Vec<f32>,
-    lower_fence: f32,
-    min_before_lower_fence: f32,
-    lower_median: f32,
-    median: f32,
-    upper_median: f32,
-    max_before_upper_fence: f32,
-    upper_fence: f32,
-    upper_outliers: Vec<f32>,
-    iqr: f32,
+    lower_outliers: Vec<f64>,
+    lower_fence: f64,
+    min_before_lower_fence: f64,
+    lower_median: f64,
+    median: f64,
+    upper_median: f64,
+    max_before_upper_fence: f64,
+    upper_fence: f64,
+    upper_outliers: Vec<f64>,
+    iqr: f64,
 }
 
 impl Quartile {
-    pub fn new(values: &[f32]) -> Result<Quartile, Box<dyn Error>> {
+    pub fn new(values: &[f64]) -> Result<Quartile, Box<dyn Error>> {
         if values.len() < 3 {
             return Err(From::from(format!(
                 "Minimum of 3 values needed for a quartile range"
@@ -28,8 +28,8 @@ impl Quartile {
 
         let len = arr.len();
         let midpoint = len / 2;
-        let median: f32;
-        let upper_median: f32;
+        let median: f64;
+        let upper_median: f64;
 
         if len % 2 == 0 {
             // Even sized array
@@ -43,14 +43,14 @@ impl Quartile {
 
         let lower_median = arr[midpoint / 2];
         let iqr = upper_median - lower_median;
-        let lower_fence = lower_median - 1.5f32 * iqr;
-        let upper_fence = upper_median + 1.5f32 * iqr;
-        let lower_outliers: Vec<f32> = arr
+        let lower_fence = lower_median - 1.5f64 * iqr;
+        let upper_fence = upper_median + 1.5f64 * iqr;
+        let lower_outliers: Vec<f64> = arr
             .iter()
             .take_while(|n| **n < lower_fence)
             .cloned()
             .collect();
-        let upper_outliers: Vec<f32> = arr
+        let upper_outliers: Vec<f64> = arr
             .iter()
             .take_while(|n| **n > upper_fence)
             .cloned()
@@ -72,47 +72,47 @@ impl Quartile {
         })
     }
 
-    pub fn lower_outliers(&self) -> Vec<f32> {
+    pub fn lower_outliers(&self) -> Vec<f64> {
         self.lower_outliers.clone()
     }
 
-    pub fn lower_fence(&self) -> f32 {
+    pub fn lower_fence(&self) -> f64 {
         self.lower_fence
     }
 
-    pub fn min_before_lower_fence(&self) -> f32 {
+    pub fn min_before_lower_fence(&self) -> f64 {
         self.min_before_lower_fence
     }
 
-    pub fn lower_median(&self) -> f32 {
+    pub fn lower_median(&self) -> f64 {
         self.lower_median
     }
 
-    pub fn median(&self) -> f32 {
+    pub fn median(&self) -> f64 {
         self.median
     }
 
-    pub fn upper_median(&self) -> f32 {
+    pub fn upper_median(&self) -> f64 {
         self.upper_median
     }
 
-    pub fn max_before_upper_fence(&self) -> f32 {
+    pub fn max_before_upper_fence(&self) -> f64 {
         self.max_before_upper_fence
     }
 
-    pub fn upper_fence(&self) -> f32 {
+    pub fn upper_fence(&self) -> f64 {
         self.upper_fence
     }
 
-    pub fn iqr(&self) -> f32 {
+    pub fn iqr(&self) -> f64 {
         self.iqr
     }
 
-    pub fn upper_outliers(&self) -> Vec<f32> {
+    pub fn upper_outliers(&self) -> Vec<f64> {
         self.upper_outliers.clone()
     }
 
-    pub fn min_value(&self) -> f32 {
+    pub fn min_value(&self) -> f64 {
         if self.lower_outliers.is_empty() {
             self.min_before_lower_fence
         } else {
@@ -120,7 +120,7 @@ impl Quartile {
         }
     }
 
-    pub fn max_value(&self) -> f32 {
+    pub fn max_value(&self) -> f64 {
         if self.upper_outliers.is_empty() {
             self.max_before_upper_fence
         } else {
