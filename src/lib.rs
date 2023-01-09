@@ -3,7 +3,6 @@ mod quartile;
 
 use clap::Parser;
 use core::fmt::Arguments;
-use hypermelon::elem::Append;
 use hypermelon::{attr::PathCommand::*, build, prelude::*};
 use quartile::Quartile;
 use serde::Deserialize;
@@ -88,7 +87,7 @@ impl<'a> BoxPlotChartTool<'a> {
 
         let mut file = fs::File::create(cli.output_file)?;
 
-        file.write_all(output.as_bytes());
+        file.write_all(output.as_bytes())?;
 
         Ok(())
     }
@@ -140,7 +139,7 @@ impl<'a> BoxPlotChartTool<'a> {
             outlier_radius: 2.0,
             styles: vec![
                 ".box-plot{fill:none;stroke:rgb(0,0,0);stroke-width:1;}".to_owned(),
-                ".outlier{}".to_owned(),
+                ".outlier{fill:none;stroke:rgb(0,0,0);stroke-width:1;}".to_owned(),
                 ".axis{fill:none;stroke:rgb(0,0,0);stroke-width:1;}".to_owned(),
                 ".labels{fill:rgb(0,0,0);font-size:10;font-family:Arial}".to_owned(),
                 ".y-labels{text-anchor:end;}".to_owned(),
@@ -153,6 +152,10 @@ impl<'a> BoxPlotChartTool<'a> {
     fn render_chart(self: &Self, rd: &RenderData) -> Result<String, Box<dyn Error>> {
         let width = rd.left_gutter + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width);
         let height = rd.top_gutter + rd.bottom_gutter + rd.y_axis_height;
+        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
+        let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
+        let scale =
+            |n: &f64| -> f64 { height - rd.bottom_gutter - (n - rd.y_axis_range.0) * y_scale };
 
         let style = build::elem("style").append(build::from_iter(rd.styles.iter()));
 
@@ -189,8 +192,6 @@ impl<'a> BoxPlotChartTool<'a> {
                     .append(format_move!("{}", rd.quartile_tuples[i].0))
             })));
 
-        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
-        let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
         let y_axis_labels =
             build::elem("g")
                 .with(("class", "labels y-labels"))
@@ -209,77 +210,70 @@ impl<'a> BoxPlotChartTool<'a> {
                         .append(format_move!("{}", n + rd.y_axis_range.0))
                 })));
 
-        let box_plots = build::from_iter(rd.quartile_tuples.iter().enumerate().map(
-            |(i, quartile_tuple)| {
-                let quartile = &quartile_tuple.1;
-                let box_width = rd.box_plot_width / 3.0;
-                let half_box_width = box_width / 2.0;
-                let whisker_width = rd.box_plot_width / 4.0;
-                let half_whisker_width = whisker_width / 2.0;
-                let upper_outliers = quartile.upper_outliers();
-                let lower_outliers = quartile.lower_outliers();
-                let y = vec![
-                    quartile.max_before_upper_fence(),
-                    quartile.upper_median(),
-                    quartile.median(),
-                    quartile.lower_median(),
-                    quartile.min_before_lower_fence(),
-                ]
-                .iter()
-                .map(|n| height - rd.bottom_gutter - (*n - rd.y_axis_range.0) * y_scale)
-                .collect::<Vec<f64>>();
-                let x = rd.left_gutter + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
-                let upper_outliers = upper_outliers.iter().map(|value| {
-                    build::single("circle").with(attrs!(
-                        ("class", "outliers"),
-                        ("cx", x),
-                        (
-                            "cy",
-                            height - rd.bottom_gutter - (*value - rd.y_axis_range.0) * y_scale
-                        ),
-                        ("r", rd.outlier_radius)
-                    ))
-                });
-                let lower_outliers = lower_outliers.iter().map(|value| {
-                    build::single("circle").with(attrs!(
-                        ("class", "outliers"),
-                        ("cx", x),
-                        (
-                            "cy",
-                            height - rd.bottom_gutter - (*value - rd.y_axis_range.0) * y_scale
-                        ),
-                        ("r", rd.outlier_radius)
-                    ))
-                });
+        let box_plots = build::from_iter((0..rd.quartile_tuples.len()).map(|i| {
+            let quartile = &rd.quartile_tuples[i].1;
+            let box_width = rd.box_plot_width / 3.0;
+            let half_box_width = box_width / 2.0;
+            let whisker_width = rd.box_plot_width / 4.0;
+            let half_whisker_width = whisker_width / 2.0;
 
-                build::elem("g")
-                    .with(attrs!(("class", "box-plot")))
-                    .append(build::single("path").with(build::path([
-                        // Top whisker
-                        M(x, y[0]),
-                        M_(-half_whisker_width, 0.0),
-                        L_(whisker_width, 0.0),
-                        M_(-half_whisker_width, 0.0),
-                        L(x, y[1]),
-                        // Box
-                        M(x - half_box_width, y[2]),
-                        L(x - half_box_width, y[1]),
-                        L_(box_width, 0.0),
-                        L(x + half_box_width, y[2]),
-                        L_(-box_width, 0.0),
-                        L(x - half_box_width, y[3]),
-                        L_(box_width, 0.0),
-                        L(x + half_box_width, y[2]),
-                        // Lowel whisker
-                        M(x, y[3]),
-                        L(x, y[4]),
-                        M_(-half_whisker_width, 0.0),
-                        L_(whisker_width, 0.0),
-                    ])))
-                    .append(build::from_iter(lower_outliers))
-                    .append(build::from_iter(upper_outliers))
-            },
-        ));
+            let y = vec![
+                quartile.max_before_upper_fence(),
+                quartile.upper_median(),
+                quartile.median(),
+                quartile.lower_median(),
+                quartile.min_before_lower_fence(),
+            ]
+            .iter()
+            .map(scale)
+            .collect::<Vec<f64>>();
+            let x = rd.left_gutter + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
+            let outliers = build::from_closure(move |w| {
+                let y_outliers: Vec<f64> = quartile
+                    .upper_outliers()
+                    .into_iter()
+                    .chain(quartile.lower_outliers())
+                    .collect();
+
+                w.render(build::from_iter(y_outliers.iter().map(|&v| {
+                    build::single("circle").with(attrs!(
+                        ("class", "outliers"),
+                        ("cx", x),
+                        (
+                            "cy",
+                            height - rd.bottom_gutter - (v - rd.y_axis_range.0) * y_scale
+                        ),
+                        ("r", rd.outlier_radius)
+                    ))
+                })))
+            });
+
+            build::elem("g")
+                .with(attrs!(("class", "box-plot")))
+                .append(outliers)
+                .append(build::single("path").with(build::path([
+                    // Top whisker
+                    M(x, y[0]),
+                    M_(-half_whisker_width, 0.0),
+                    L_(whisker_width, 0.0),
+                    M_(-half_whisker_width, 0.0),
+                    L(x, y[1]),
+                    // Box
+                    M(x - half_box_width, y[2]),
+                    L(x - half_box_width, y[1]),
+                    L_(box_width, 0.0),
+                    L(x + half_box_width, y[2]),
+                    L_(-box_width, 0.0),
+                    L(x - half_box_width, y[3]),
+                    L_(box_width, 0.0),
+                    L(x + half_box_width, y[2]),
+                    // Lowel whisker
+                    M(x, y[3]),
+                    L(x, y[4]),
+                    M_(-half_whisker_width, 0.0),
+                    L_(whisker_width, 0.0),
+                ])))
+        }));
 
         let title = build::elem("text")
             .with(attrs!(
