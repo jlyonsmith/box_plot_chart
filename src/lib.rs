@@ -1,13 +1,10 @@
 mod log_macros;
 mod quartile;
 
-use chrono::NaiveDate;
 use clap::Parser;
 use core::fmt::Arguments;
-use hypermelon::build;
-use hypermelon::prelude::*;
-use hypermelon::render;
-use hypermelon::tools::WriteWrap;
+use hypermelon::elem::Append;
+use hypermelon::{attr::PathCommand::*, build, prelude::*};
 use quartile::Quartile;
 use serde::Deserialize;
 use std::error::Error;
@@ -49,16 +46,20 @@ pub struct ItemData {
     pub values: Vec<f64>,
 }
 
+#[derive(Debug)]
 struct RenderData {
-    chart_width: f64,
-    chart_height: f64,
-    y_axis_width: f64,
-    x_axis_height: f64,
+    title: String,
+    units: String,
+    y_axis_height: f64,
+    y_axis_range: (f64, f64),
+    y_axis_ticks: f64,
+    left_gutter: f64,
+    bottom_gutter: f64,
+    top_gutter: f64,
     box_plot_width: f64,
-    box_width: f64,
     outlier_radius: f64,
     styles: Vec<String>,
-    quartiles: Vec<(String, Quartile)>,
+    quartile_tuples: Vec<(String, Quartile)>,
 }
 
 impl<'a> BoxPlotChartTool<'a> {
@@ -80,6 +81,9 @@ impl<'a> BoxPlotChartTool<'a> {
 
         let chart_data = Self::read_chart_file(&cli.input_file)?;
         let render_data = self.process_chart_data(&chart_data)?;
+
+        //println!("{:?}", &render_data);
+
         let output = self.render_chart(&render_data)?;
 
         let mut file = fs::File::create(cli.output_file)?;
@@ -96,88 +100,205 @@ impl<'a> BoxPlotChartTool<'a> {
         Ok(chart_data)
     }
 
-    fn process_chart_data(
-        self: &Self,
-        chart_data: &ChartData,
-    ) -> Result<RenderData, Box<dyn Error>> {
-        // TODO(john): Calculate the min/max of the y-axis range
+    fn process_chart_data(self: &Self, cd: &ChartData) -> Result<RenderData, Box<dyn Error>> {
+        let mut quartile_tuples: Vec<(String, Quartile)> = vec![];
+        let mut y_axis_range: (f64, f64) = (f64::MAX, f64::MIN);
+        let y_axis_ticks = 10.0;
 
-        fn quartile_tuple(item_data: &ItemData) -> Result<(String, Quartile), Box<dyn Error>> {
-            Ok((item_data.key.to_owned(), Quartile::new(&item_data.values)?))
+        for item_data in cd.data.iter() {
+            let quartile = Quartile::new(&item_data.values)?;
+            let min_value = quartile.min_value();
+            let max_value = quartile.max_value();
+
+            if min_value < y_axis_range.0 {
+                y_axis_range.0 = f64::floor(min_value / y_axis_ticks) * y_axis_ticks;
+            }
+
+            if max_value > y_axis_range.1 {
+                y_axis_range.1 = f64::ceil(max_value / y_axis_ticks) * y_axis_ticks;
+            }
+
+            quartile_tuples.push((item_data.key.to_owned(), quartile));
         }
 
-        let quartiles = chart_data
-            .data
-            .iter()
-            .map(quartile_tuple)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        let x_axis_height = 20.0;
-        let y_axis_width = 20.0;
-        let box_plot_width = 20.0;
-        let chart_width = y_axis_width + ((quartiles.len() as f64) * box_plot_width);
-        let chart_height = x_axis_height + 100.0;
+        let top_gutter = 40.0;
+        let bottom_gutter = 80.0;
+        let left_gutter = 40.0;
+        let y_axis_height = 400.0;
+        let box_plot_width = 60.0;
 
         Ok(RenderData {
-            chart_width,
-            chart_height,
-            x_axis_height,
-            y_axis_width,
+            title: cd.title.to_owned(),
+            units: cd.units.to_owned(),
+            y_axis_height,
+            y_axis_range,
+            y_axis_ticks,
+            top_gutter,
+            bottom_gutter,
+            left_gutter,
             box_plot_width,
-            box_width: 5.0,
-            outlier_radius: 0.0,
+            outlier_radius: 2.0,
             styles: vec![
-                ".whisker-style { stroke: rgb(0,0,0); stroke-width: 1; }".to_owned(),
-                ".box-style { stroke: rgb(0,0,0); stroke-width: 1; }".to_owned(),
-                ".outlier-style {}".to_owned(),
-                ".axis-style { stroke: rgb(0,0,0); stroke-width: 1; }".to_owned(),
+                ".box-plot{fill:none;stroke:rgb(0,0,0);stroke-width:1;}".to_owned(),
+                ".outlier{}".to_owned(),
+                ".axis{fill:none;stroke:rgb(0,0,0);stroke-width:1;}".to_owned(),
+                ".labels{fill:rgb(0,0,0);font-size:10;font-family:Arial}".to_owned(),
+                ".y-labels{text-anchor:end;}".to_owned(),
+                ".title{font-family:Arial;font-size:12;text-anchor:middle;}".to_owned(),
             ],
-            quartiles: quartiles,
+            quartile_tuples,
         })
     }
 
-    fn render_chart(self: &Self, render_data: &RenderData) -> Result<String, Box<dyn Error>> {
-        let style = build::elem("style").append(build::from_iter(render_data.styles.iter()));
+    fn render_chart(self: &Self, rd: &RenderData) -> Result<String, Box<dyn Error>> {
+        let width = rd.left_gutter + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width);
+        let height = rd.top_gutter + rd.bottom_gutter + rd.y_axis_height;
+
+        let style = build::elem("style").append(build::from_iter(rd.styles.iter()));
 
         let svg = build::elem("svg").with(attrs!(
             ("xmlns", "http://www.w3.org/2000/svg"),
-            ("width", render_data.chart_width),
-            ("height", render_data.chart_height),
-            (
-                "viewBox",
-                format_move!(
-                    "0 0 {} {}",
-                    render_data.chart_width,
-                    render_data.chart_height
-                )
-            ),
+            ("width", width),
+            ("height", height),
+            ("viewBox", format_move!("0 0 {} {}", width, height)),
             ("style", "background-color: white;")
         ));
 
-        // TODO(john): Render the x-axis
-        let y_axis = build::single("line").with(attrs!(
-            ("class", "axis-style"),
-            ("x1", render_data.y_axis_width),
-            ("y1", 0.0),
-            ("x2", render_data.y_axis_width),
-            ("y2", render_data.chart_height - render_data.x_axis_height)
+        let axis = build::single("polyline").with(attrs!(
+            ("class", "axis"),
+            build::points([
+                (rd.left_gutter, rd.top_gutter),
+                (rd.left_gutter, rd.top_gutter + rd.y_axis_height),
+                (width, rd.top_gutter + rd.y_axis_height),
+            ])
         ));
-        // TODO(john): Add the y-axis labels
-        let x_axis = build::single("line").with(attrs!(
-            ("class", "axis-style"),
-            ("x1", render_data.y_axis_width),
-            ("y1", render_data.chart_height - render_data.x_axis_height),
-            ("x2", render_data.chart_width),
-            ("y2", render_data.chart_height - render_data.x_axis_height)
+        let x_axis_labels = build::elem("g")
+            .with(("class", "labels"))
+            .append(build::from_iter((0..rd.quartile_tuples.len()).map(|i| {
+                build::elem("text")
+                    .with(attrs!((
+                        "transform",
+                        format_move!(
+                            "translate({},{}) rotate(45)",
+                            rd.left_gutter
+                                + (i as f64 * rd.box_plot_width)
+                                + rd.box_plot_width / 2.0,
+                            height - rd.bottom_gutter + 15.0
+                        )
+                    )))
+                    .append(format_move!("{}", rd.quartile_tuples[i].0))
+            })));
+
+        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
+        let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
+        let y_axis_labels =
+            build::elem("g")
+                .with(("class", "labels y-labels"))
+                .append(build::from_iter((0..=y_range).map(|i| {
+                    let n = i as f64 * rd.y_axis_ticks;
+
+                    build::elem("text")
+                        .with(attrs!((
+                            "transform",
+                            format_move!(
+                                "translate({},{})",
+                                rd.left_gutter - 10.0,
+                                height - rd.bottom_gutter - f64::floor(n * y_scale) + 5.0
+                            )
+                        )))
+                        .append(format_move!("{}", n + rd.y_axis_range.0))
+                })));
+
+        let box_plots = build::from_iter(rd.quartile_tuples.iter().enumerate().map(
+            |(i, quartile_tuple)| {
+                let quartile = &quartile_tuple.1;
+                let box_width = rd.box_plot_width / 3.0;
+                let half_box_width = box_width / 2.0;
+                let whisker_width = rd.box_plot_width / 4.0;
+                let half_whisker_width = whisker_width / 2.0;
+                let upper_outliers = quartile.upper_outliers();
+                let lower_outliers = quartile.lower_outliers();
+                let y = vec![
+                    quartile.max_before_upper_fence(),
+                    quartile.upper_median(),
+                    quartile.median(),
+                    quartile.lower_median(),
+                    quartile.min_before_lower_fence(),
+                ]
+                .iter()
+                .map(|n| height - rd.bottom_gutter - (*n - rd.y_axis_range.0) * y_scale)
+                .collect::<Vec<f64>>();
+                let x = rd.left_gutter + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
+                let upper_outliers = upper_outliers.iter().map(|value| {
+                    build::single("circle").with(attrs!(
+                        ("class", "outliers"),
+                        ("cx", x),
+                        (
+                            "cy",
+                            height - rd.bottom_gutter - (*value - rd.y_axis_range.0) * y_scale
+                        ),
+                        ("r", rd.outlier_radius)
+                    ))
+                });
+                let lower_outliers = lower_outliers.iter().map(|value| {
+                    build::single("circle").with(attrs!(
+                        ("class", "outliers"),
+                        ("cx", x),
+                        (
+                            "cy",
+                            height - rd.bottom_gutter - (*value - rd.y_axis_range.0) * y_scale
+                        ),
+                        ("r", rd.outlier_radius)
+                    ))
+                });
+
+                build::elem("g")
+                    .with(attrs!(("class", "box-plot")))
+                    .append(build::single("path").with(build::path([
+                        // Top whisker
+                        M(x, y[0]),
+                        M_(-half_whisker_width, 0.0),
+                        L_(whisker_width, 0.0),
+                        M_(-half_whisker_width, 0.0),
+                        L(x, y[1]),
+                        // Box
+                        M(x - half_box_width, y[2]),
+                        L(x - half_box_width, y[1]),
+                        L_(box_width, 0.0),
+                        L(x + half_box_width, y[2]),
+                        L_(-box_width, 0.0),
+                        L(x - half_box_width, y[3]),
+                        L_(box_width, 0.0),
+                        L(x + half_box_width, y[2]),
+                        // Lowel whisker
+                        M(x, y[3]),
+                        L(x, y[4]),
+                        M_(-half_whisker_width, 0.0),
+                        L_(whisker_width, 0.0),
+                    ])))
+                    .append(build::from_iter(lower_outliers))
+                    .append(build::from_iter(upper_outliers))
+            },
         ));
-        // TODO(john): Add x-axis labels
-        // TODO(john): Add y-axis lines
-        // TODO(john): Render one box plot
-        // TODO(john): Render all the box plots
+
+        let title = build::elem("text")
+            .with(attrs!(
+                ("class", "title"),
+                ("x", width / 2.0),
+                ("y", rd.top_gutter / 2.0)
+            ))
+            .append(format_move!("{} ({})", &rd.title, &rd.units));
+
         // TODO(john): Render the chart title
 
         let mut output = String::new();
-        let all = svg.append(style).append(y_axis).append(x_axis);
+        let all = svg
+            .append(style)
+            .append(axis)
+            .append(x_axis_labels)
+            .append(y_axis_labels)
+            .append(box_plots)
+            .append(title);
 
         hypermelon::render(all, &mut output)?;
 
