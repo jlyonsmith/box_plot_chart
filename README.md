@@ -4,3 +4,4 @@
 [![Crates.io](https://img.shields.io/crates/v/box_plot_chart.svg)](https://crates.io/crates/box_plot_chart)
 [![Docs.rs](https://docs.rs/box_plot_chart/badge.svg)](https://docs.rs/box_plot_chart)
 
+This is a simple box plot generator.

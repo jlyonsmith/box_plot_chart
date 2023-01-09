@@ -55,6 +55,7 @@ struct RenderData {
     left_gutter: f64,
     bottom_gutter: f64,
     top_gutter: f64,
+    right_gutter: f64,
     box_plot_width: f64,
     outlier_radius: f64,
     styles: Vec<String>,
@@ -123,6 +124,7 @@ impl<'a> BoxPlotChartTool<'a> {
         let top_gutter = 40.0;
         let bottom_gutter = 80.0;
         let left_gutter = 40.0;
+        let right_gutter = 40.0;
         let y_axis_height = 400.0;
         let box_plot_width = 60.0;
 
@@ -135,6 +137,7 @@ impl<'a> BoxPlotChartTool<'a> {
             top_gutter,
             bottom_gutter,
             left_gutter,
+            right_gutter,
             box_plot_width,
             outlier_radius: 2.0,
             styles: vec![
@@ -150,7 +153,9 @@ impl<'a> BoxPlotChartTool<'a> {
     }
 
     fn render_chart(self: &Self, rd: &RenderData) -> Result<String, Box<dyn Error>> {
-        let width = rd.left_gutter + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width);
+        let width = rd.left_gutter
+            + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width)
+            + rd.right_gutter;
         let height = rd.top_gutter + rd.bottom_gutter + rd.y_axis_height;
         let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
         let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
@@ -172,7 +177,7 @@ impl<'a> BoxPlotChartTool<'a> {
             build::points([
                 (rd.left_gutter, rd.top_gutter),
                 (rd.left_gutter, rd.top_gutter + rd.y_axis_height),
-                (width, rd.top_gutter + rd.y_axis_height),
+                (width - rd.right_gutter, rd.top_gutter + rd.y_axis_height),
             ])
         ));
         let x_axis_labels = build::elem("g")
