@@ -46,16 +46,21 @@ pub struct ItemData {
 }
 
 #[derive(Debug)]
+struct Gutter {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+}
+
+#[derive(Debug)]
 struct RenderData {
     title: String,
     units: String,
     y_axis_height: f64,
     y_axis_range: (f64, f64),
     y_axis_ticks: f64,
-    left_gutter: f64,
-    bottom_gutter: f64,
-    top_gutter: f64,
-    right_gutter: f64,
+    gutter: Gutter,
     box_plot_width: f64,
     outlier_radius: f64,
     styles: Vec<String>,
@@ -81,14 +86,9 @@ impl<'a> BoxPlotChartTool<'a> {
 
         let chart_data = Self::read_chart_file(&cli.input_file)?;
         let render_data = self.process_chart_data(&chart_data)?;
-
-        //println!("{:?}", &render_data);
-
         let output = self.render_chart(&render_data)?;
 
-        let mut file = fs::File::create(cli.output_file)?;
-
-        file.write_all(output.as_bytes())?;
+        Self::write_svg_file(&cli.output_file, &output)?;
 
         Ok(())
     }
@@ -98,6 +98,14 @@ impl<'a> BoxPlotChartTool<'a> {
         let chart_data: ChartData = json5::from_str(&content)?;
 
         Ok(chart_data)
+    }
+
+    fn write_svg_file(svg_file: &PathBuf, output: &str) -> Result<(), Box<dyn Error>> {
+        let mut file = fs::File::create(svg_file)?;
+
+        file.write_all(output.as_bytes())?;
+
+        Ok(())
     }
 
     fn process_chart_data(self: &Self, cd: &ChartData) -> Result<RenderData, Box<dyn Error>> {
@@ -121,10 +129,12 @@ impl<'a> BoxPlotChartTool<'a> {
             quartile_tuples.push((item_data.key.to_owned(), quartile));
         }
 
-        let top_gutter = 40.0;
-        let bottom_gutter = 80.0;
-        let left_gutter = 40.0;
-        let right_gutter = 40.0;
+        let gutter = Gutter {
+            top: 40.0,
+            bottom: 80.0,
+            left: 40.0,
+            right: 40.0,
+        };
         let y_axis_height = 400.0;
         let box_plot_width = 60.0;
 
@@ -134,10 +144,7 @@ impl<'a> BoxPlotChartTool<'a> {
             y_axis_height,
             y_axis_range,
             y_axis_ticks,
-            top_gutter,
-            bottom_gutter,
-            left_gutter,
-            right_gutter,
+            gutter,
             box_plot_width,
             outlier_radius: 2.0,
             styles: vec![
@@ -153,14 +160,14 @@ impl<'a> BoxPlotChartTool<'a> {
     }
 
     fn render_chart(self: &Self, rd: &RenderData) -> Result<String, Box<dyn Error>> {
-        let width = rd.left_gutter
+        let width = rd.gutter.left
             + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width)
-            + rd.right_gutter;
-        let height = rd.top_gutter + rd.bottom_gutter + rd.y_axis_height;
+            + rd.gutter.right;
+        let height = rd.gutter.top + rd.gutter.bottom + rd.y_axis_height;
         let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
         let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
         let scale =
-            |n: &f64| -> f64 { height - rd.bottom_gutter - (n - rd.y_axis_range.0) * y_scale };
+            |n: &f64| -> f64 { height - rd.gutter.bottom - (n - rd.y_axis_range.0) * y_scale };
 
         let style = build::elem("style").append(build::from_iter(rd.styles.iter()));
 
@@ -175,9 +182,9 @@ impl<'a> BoxPlotChartTool<'a> {
         let axis = build::single("polyline").with(attrs!(
             ("class", "axis"),
             build::points([
-                (rd.left_gutter, rd.top_gutter),
-                (rd.left_gutter, rd.top_gutter + rd.y_axis_height),
-                (width - rd.right_gutter, rd.top_gutter + rd.y_axis_height),
+                (rd.gutter.left, rd.gutter.top),
+                (rd.gutter.left, rd.gutter.top + rd.y_axis_height),
+                (width - rd.gutter.right, rd.gutter.top + rd.y_axis_height),
             ])
         ));
         let x_axis_labels = build::elem("g")
@@ -188,10 +195,10 @@ impl<'a> BoxPlotChartTool<'a> {
                         "transform",
                         format_move!(
                             "translate({},{}) rotate(45)",
-                            rd.left_gutter
+                            rd.gutter.left
                                 + (i as f64 * rd.box_plot_width)
                                 + rd.box_plot_width / 2.0,
-                            height - rd.bottom_gutter + 15.0
+                            height - rd.gutter.bottom + 15.0
                         )
                     )))
                     .append(format_move!("{}", rd.quartile_tuples[i].0))
@@ -208,8 +215,8 @@ impl<'a> BoxPlotChartTool<'a> {
                             "transform",
                             format_move!(
                                 "translate({},{})",
-                                rd.left_gutter - 10.0,
-                                height - rd.bottom_gutter - f64::floor(n * y_scale) + 5.0
+                                rd.gutter.left - 10.0,
+                                height - rd.gutter.bottom - f64::floor(n * y_scale) + 5.0
                             )
                         )))
                         .append(format_move!("{}", n + rd.y_axis_range.0))
@@ -232,7 +239,7 @@ impl<'a> BoxPlotChartTool<'a> {
             .iter()
             .map(scale)
             .collect::<Vec<f64>>();
-            let x = rd.left_gutter + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
+            let x = rd.gutter.left + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
             let outliers = build::from_closure(move |w| {
                 let y_outliers: Vec<f64> = quartile
                     .upper_outliers()
@@ -246,7 +253,7 @@ impl<'a> BoxPlotChartTool<'a> {
                         ("cx", x),
                         (
                             "cy",
-                            height - rd.bottom_gutter - (v - rd.y_axis_range.0) * y_scale
+                            height - rd.gutter.bottom - (v - rd.y_axis_range.0) * y_scale
                         ),
                         ("r", rd.outlier_radius)
                     ))
@@ -284,7 +291,7 @@ impl<'a> BoxPlotChartTool<'a> {
             .with(attrs!(
                 ("class", "title"),
                 ("x", width / 2.0),
-                ("y", rd.top_gutter / 2.0)
+                ("y", rd.gutter.top / 2.0)
             ))
             .append(format_move!("{} ({})", &rd.title, &rd.units));
 
