@@ -1,5 +1,5 @@
 mod log_macros;
-mod quartile;
+pub mod quartile;
 
 use clap::Parser;
 use core::fmt::Arguments;
