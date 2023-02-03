@@ -111,7 +111,6 @@ impl<'a> BoxPlotChartTool<'a> {
     fn process_chart_data(self: &Self, cd: &ChartData) -> Result<RenderData, Box<dyn Error>> {
         let mut quartile_tuples: Vec<(String, Quartile)> = vec![];
         let mut y_axis_range: (f64, f64) = (f64::MAX, f64::MIN);
-        let y_axis_ticks = 10.0;
 
         for item_data in cd.data.iter() {
             let quartile = Quartile::new(&item_data.values)?;
@@ -119,15 +118,25 @@ impl<'a> BoxPlotChartTool<'a> {
             let max_value = quartile.max_value();
 
             if min_value < y_axis_range.0 {
-                y_axis_range.0 = f64::floor(min_value / y_axis_ticks) * y_axis_ticks;
+                y_axis_range.0 = min_value;
             }
 
             if max_value > y_axis_range.1 {
-                y_axis_range.1 = f64::ceil(max_value / y_axis_ticks) * y_axis_ticks;
+                y_axis_range.1 = max_value;
             }
 
             quartile_tuples.push((item_data.key.to_owned(), quartile));
         }
+
+        let y_axis_num_intervals = 20;
+        let y_axis_interval = (10.0_f64).powf(((y_axis_range.1 - y_axis_range.0).log10()).ceil())
+            / (y_axis_num_intervals as f64);
+        y_axis_range = (
+            f64::floor(y_axis_range.0 / y_axis_interval) * y_axis_interval,
+            f64::ceil(y_axis_range.1 / y_axis_interval) * y_axis_interval,
+        );
+
+        println!("{:?}", y_axis_range);
 
         let gutter = Gutter {
             top: 40.0,
@@ -143,7 +152,7 @@ impl<'a> BoxPlotChartTool<'a> {
             units: cd.units.to_owned(),
             y_axis_height,
             y_axis_range,
-            y_axis_ticks,
+            y_axis_ticks: y_axis_interval,
             gutter,
             box_plot_width,
             outlier_radius: 2.0,
