@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="520" viewBox="0 0 380 520" style="background-color: white;">
+	<style>
+.box-plot{fill:none;stroke:rgb(0,0,0);stroke-width:1;}
+.outlier{fill:none;stroke:rgb(0,0,0);stroke-width:1;}
+.axis{fill:none;stroke:rgb(0,0,0);stroke-width:1;}
+.labels{fill:rgb(0,0,0);font-size:10;font-family:Arial}
+.y-labels{text-anchor:end;}
+.title{font-family:Arial;font-size:12;text-anchor:middle;}
+	</style>
+	<polyline class="axis" points="40,40 40,440 340,440 "/>
+	<g class="labels">
+		<text transform="translate(70,455) rotate(45)">
+2023-05-01
+		</text>
+		<text transform="translate(130,455) rotate(45)">
+2023-05-02
+		</text>
+		<text transform="translate(190,455) rotate(45)">
+2023-05-03
+		</text>
+		<text transform="translate(250,455) rotate(45)">
+2023-05-04
+		</text>
+		<text transform="translate(310,455) rotate(45)">
+2023-05-05
+		</text>
+	</g>
+	<g class="labels y-labels">
+		<text transform="translate(30,445)">
+50
+		</text>
+		<text transform="translate(30,365)">
+100
+		</text>
+		<text transform="translate(30,285)">
+150
+		</text>
+		<text transform="translate(30,205)">
+200
+		</text>
+		<text transform="translate(30,125)">
+250
+		</text>
+		<text transform="translate(30,45)">
+300
+		</text>
+	</g>
+	<g class="box-plot">
+		<circle class="outliers" cx="70" cy="440" r="2"/>
+		<path d=" M 70 296 m -7.5 0 l 15 0 m -7.5 0 L 70 328 M 60 352 L 60 328 l 20 0 L 80 352 l -20 0 L 60 361.6 l 20 0 L 80 352 M 70 361.6 L 70 374.4 m -7.5 0 l 15 0"/>
+	</g>
+	<g class="box-plot">
+		<path d=" M 130 72 m -7.5 0 l 15 0 m -7.5 0 L 130 200 M 120 352 L 120 200 l 20 0 L 140 352 l -20 0 L 120 355.2 l 20 0 L 140 352 M 130 355.2 L 130 360 m -7.5 0 l 15 0"/>
+	</g>
+	<g class="box-plot">
+		<path d=" M 190 40 m -7.5 0 l 15 0 m -7.5 0 L 190 200 M 180 349.6 L 180 200 l 20 0 L 200 349.6 l -20 0 L 180 355.2 l 20 0 L 200 349.6 M 190 355.2 L 190 360 m -7.5 0 l 15 0"/>
+	</g>
+	<g class="box-plot">
+		<path d=" M 250 200 m -7.5 0 l 15 0 m -7.5 0 L 250 280 M 240 348 L 240 280 l 20 0 L 260 348 l -20 0 L 240 355.2 l 20 0 L 260 348 M 250 355.2 L 250 363.2 m -7.5 0 l 15 0"/>
+	</g>
+	<g class="box-plot">
+		<path d=" M 310 120 m -7.5 0 l 15 0 m -7.5 0 L 310 200 M 300 355.2 L 300 200 l 20 0 L 320 355.2 l -20 0 L 300 360 l 20 0 L 320 355.2 M 310 360 L 310 368 m -7.5 0 l 15 0"/>
+	</g>
+	<text class="title" x="190" y="20">
+Process Startup Time (ms)
+	</text>
+</svg>
