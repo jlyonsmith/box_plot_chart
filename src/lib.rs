@@ -6,10 +6,12 @@ use core::fmt::Arguments;
 use hypermelon::{attr::PathCommand::*, build, prelude::*};
 use quartile::Quartile;
 use serde::Deserialize;
-use std::error::Error;
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{
+    error::Error,
+    fs::File,
+    io::{self, Error as IoError, Read, Write},
+    path::PathBuf,
+};
 
 pub trait BoxPlotChartLog {
     fn output(self: &Self, args: Arguments);
@@ -24,12 +26,29 @@ pub struct BoxPlotChartTool<'a> {
 #[derive(Parser)]
 #[clap(version, about, long_about = None)]
 struct Cli {
-    /// Specify the JSON data file
+    /// The JSON5 input file
     #[clap(value_name = "INPUT_FILE")]
-    input_file: PathBuf,
+    input_file: Option<PathBuf>,
 
+    /// The SVG output file
     #[clap(value_name = "OUTPUT_FILE")]
-    output_file: PathBuf,
+    output_file: Option<PathBuf>,
+}
+
+impl Cli {
+    fn get_output(&self) -> Result<Box<dyn Write>, IoError> {
+        match self.output_file {
+            Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Write>),
+            None => Ok(Box::new(io::stdout())),
+        }
+    }
+
+    fn get_input(&self) -> Result<Box<dyn Read>, IoError> {
+        match self.input_file {
+            Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Read>),
+            None => Ok(Box::new(io::stdin())),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -84,26 +103,27 @@ impl<'a> BoxPlotChartTool<'a> {
             }
         };
 
-        let chart_data = Self::read_chart_file(&cli.input_file)?;
+        let chart_data = Self::read_chart_file(cli.get_input()?)?;
         let render_data = self.process_chart_data(&chart_data)?;
         let output = self.render_chart(&render_data)?;
 
-        Self::write_svg_file(&cli.output_file, &output)?;
+        Self::write_svg_file(cli.get_output()?, &output)?;
 
         Ok(())
     }
 
-    fn read_chart_file(chart_file: &PathBuf) -> Result<ChartData, Box<dyn Error>> {
-        let content = fs::read_to_string(chart_file)?;
+    fn read_chart_file(mut reader: Box<dyn Read>) -> Result<ChartData, Box<dyn Error>> {
+        let mut content = String::new();
+
+        reader.read_to_string(&mut content)?;
+
         let chart_data: ChartData = json5::from_str(&content)?;
 
         Ok(chart_data)
     }
 
-    fn write_svg_file(svg_file: &PathBuf, output: &str) -> Result<(), Box<dyn Error>> {
-        let mut file = fs::File::create(svg_file)?;
-
-        file.write_all(output.as_bytes())?;
+    fn write_svg_file(mut writer: Box<dyn Write>, output: &str) -> Result<(), Box<dyn Error>> {
+        write!(writer, "{}", output)?;
 
         Ok(())
     }

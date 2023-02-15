@@ -10,6 +10,8 @@ Here is an example of the output:
 
 ![Example Box Plot](example/example.svg)
 
+Install with `cargo install box_plot_chart`.  Run with `box-plot-chart`.
+
 Features of the tool include:
 
 - Automatic scaling of the Y axis labels
