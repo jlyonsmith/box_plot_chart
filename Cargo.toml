@@ -6,8 +6,8 @@ authors = ["John Lyon-Smith <john@lyon-smith.org>"]
 description = "A description of the project"
 repository = "https://github.com/jlyonsmith/box_plot_chart"
 readme = "README.md"
-keywords = ["version", "command-line", "development"]
-categories = ["command-line-utilities", "development-tools"]
+keywords = ["chart", "command-line", "graph", "visualization"]
+categories = ["command-line-utilities"]
 license = "Unlicense"
 
 [dependencies]

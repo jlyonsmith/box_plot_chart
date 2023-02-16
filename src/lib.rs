@@ -38,7 +38,7 @@ struct Cli {
 impl Cli {
     fn get_output(&self) -> Result<Box<dyn Write>, IoError> {
         match self.output_file {
-            Some(ref path) => File::open(path).map(|f| Box::new(f) as Box<dyn Write>),
+            Some(ref path) => File::create(path).map(|f| Box::new(f) as Box<dyn Write>),
             None => Ok(Box::new(io::stdout())),
         }
     }
@@ -78,7 +78,7 @@ struct RenderData {
     units: String,
     y_axis_height: f64,
     y_axis_range: (f64, f64),
-    y_axis_ticks: f64,
+    y_axis_interval: f64,
     gutter: Gutter,
     box_plot_width: f64,
     outlier_radius: f64,
@@ -156,13 +156,11 @@ impl<'a> BoxPlotChartTool<'a> {
             f64::ceil(y_axis_range.1 / y_axis_interval) * y_axis_interval,
         );
 
-        println!("{:?}", y_axis_range);
-
         let gutter = Gutter {
             top: 40.0,
             bottom: 80.0,
-            left: 40.0,
-            right: 40.0,
+            left: 80.0,
+            right: 80.0,
         };
         let y_axis_height = 400.0;
         let box_plot_width = 60.0;
@@ -172,7 +170,7 @@ impl<'a> BoxPlotChartTool<'a> {
             units: cd.units.to_owned(),
             y_axis_height,
             y_axis_range,
-            y_axis_ticks: y_axis_interval,
+            y_axis_interval,
             gutter,
             box_plot_width,
             outlier_radius: 2.0,
@@ -193,7 +191,7 @@ impl<'a> BoxPlotChartTool<'a> {
             + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width)
             + rd.gutter.right;
         let height = rd.gutter.top + rd.gutter.bottom + rd.y_axis_height;
-        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_ticks) as usize;
+        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_interval) as usize;
         let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
         let scale =
             |n: &f64| -> f64 { height - rd.gutter.bottom - (n - rd.y_axis_range.0) * y_scale };
@@ -237,7 +235,7 @@ impl<'a> BoxPlotChartTool<'a> {
             build::elem("g")
                 .with(("class", "labels y-labels"))
                 .append(build::from_iter((0..=y_range).map(|i| {
-                    let n = i as f64 * rd.y_axis_ticks;
+                    let n = i as f64 * rd.y_axis_interval;
 
                     build::elem("text")
                         .with(attrs!((
@@ -323,8 +321,6 @@ impl<'a> BoxPlotChartTool<'a> {
                 ("y", rd.gutter.top / 2.0)
             ))
             .append(format_move!("{} ({})", &rd.title, &rd.units));
-
-        // TODO(john): Render the chart title
 
         let mut output = String::new();
         let all = svg
