@@ -89,6 +89,7 @@ struct RenderData {
     y_axis_height: f64,
     y_axis_range: (f64, f64),
     y_axis_interval: f64,
+    y_axis_dps: usize,
     gutter: Gutter,
     box_plot_width: f64,
     outlier_radius: f64,
@@ -161,6 +162,13 @@ impl<'a> BoxPlotChartTool<'a> {
         let y_axis_num_intervals = 20;
         let y_axis_interval = (10.0_f64).powf(((y_axis_range.1 - y_axis_range.0).log10()).ceil())
             / (y_axis_num_intervals as f64);
+        let dps = y_axis_interval.log10();
+        let y_axis_dps = if dps < 0.0 {
+            dps.abs().ceil() as usize
+        } else {
+            0
+        };
+
         y_axis_range = (
             f64::floor(y_axis_range.0 / y_axis_interval) * y_axis_interval,
             f64::ceil(y_axis_range.1 / y_axis_interval) * y_axis_interval,
@@ -181,6 +189,7 @@ impl<'a> BoxPlotChartTool<'a> {
             y_axis_height,
             y_axis_range,
             y_axis_interval,
+            y_axis_dps,
             gutter,
             box_plot_width,
             outlier_radius: 2.0,
@@ -256,7 +265,11 @@ impl<'a> BoxPlotChartTool<'a> {
                                 height - rd.gutter.bottom - f64::floor(n * y_scale) + 5.0
                             )
                         )))
-                        .append(format_move!("{}", n + rd.y_axis_range.0))
+                        .append(format_move!(
+                            "{0:.1$}",
+                            n + rd.y_axis_range.0,
+                            rd.y_axis_dps
+                        ))
                 })));
 
         let box_plots = build::from_iter((0..rd.quartile_tuples.len()).map(|i| {
