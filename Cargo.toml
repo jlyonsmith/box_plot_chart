@@ -20,6 +20,7 @@ json5 = "0.4.1"
 lazy_static = "1.4.0"
 serde = { version = "1.0.152", features = ["derive"] }
 svg = "0.17.0"
+yansi = "1.0.1"
 
 [dev-dependencies]
 criterion = "^0.3"

@@ -89,7 +89,7 @@ struct RenderData {
     y_axis_height: f64,
     y_axis_range: (f64, f64),
     y_axis_interval: f64,
-    y_axis_dps: usize,
+    y_axis_decimal_places: usize,
     gutter: Gutter,
     box_plot_width: f64,
     outlier_radius: f64,
@@ -159,12 +159,12 @@ impl<'a> BoxPlotChartTool<'a> {
             quartile_tuples.push((item_data.key.to_owned(), quartile));
         }
 
-        let y_axis_num_intervals = 20;
+        let y_axis_max_intervals = 20;
         let y_axis_interval = (10.0_f64).powf(((y_axis_range.1 - y_axis_range.0).log10()).ceil())
-            / (y_axis_num_intervals as f64);
-        let dps = y_axis_interval.log10();
-        let y_axis_dps = if dps < 0.0 {
-            dps.abs().ceil() as usize
+            / (y_axis_max_intervals as f64);
+        let decimal_places = y_axis_interval.log10();
+        let y_axis_decimal_places = if decimal_places < 0.0 {
+            decimal_places.abs().ceil() as usize
         } else {
             0
         };
@@ -189,7 +189,7 @@ impl<'a> BoxPlotChartTool<'a> {
             y_axis_height,
             y_axis_range,
             y_axis_interval,
-            y_axis_dps,
+            y_axis_decimal_places,
             gutter,
             box_plot_width,
             outlier_radius: 2.0,
@@ -210,10 +210,9 @@ impl<'a> BoxPlotChartTool<'a> {
             + ((rd.quartile_tuples.len() as f64) * rd.box_plot_width)
             + rd.gutter.right;
         let height = rd.gutter.top + rd.gutter.bottom + rd.y_axis_height;
-        let y_range = ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_interval) as usize;
+        let num_y_axis_labels =
+            ((rd.y_axis_range.1 - rd.y_axis_range.0) / rd.y_axis_interval) as usize + 1;
         let y_scale = rd.y_axis_height / (rd.y_axis_range.1 - rd.y_axis_range.0);
-        let scale =
-            |n: &f64| -> f64 { height - rd.gutter.bottom - (n - rd.y_axis_range.0) * y_scale };
         let mut document = Document::new()
             .set("xmlns", "http://www.w3.org/2000/svg")
             .set("width", width)
@@ -246,11 +245,16 @@ impl<'a> BoxPlotChartTool<'a> {
 
         let mut y_axis_labels = element::Group::new().set("class", "labels y-labels");
 
-        for i in 0..=y_range {
+        for i in 0..num_y_axis_labels {
             let n = i as f64 * rd.y_axis_interval;
 
             y_axis_labels.append(
-                element::Text::new(format!("{0:.1$}", n + rd.y_axis_range.0, rd.y_axis_dps)).set(
+                element::Text::new(format!(
+                    "{0:.1$}",
+                    n + rd.y_axis_range.0,
+                    rd.y_axis_decimal_places
+                ))
+                .set(
                     "transform",
                     format!(
                         "translate({},{})",
@@ -278,7 +282,7 @@ impl<'a> BoxPlotChartTool<'a> {
                 quartile.min_before_lower_fence(),
             ]
             .iter()
-            .map(scale)
+            .map(|n: &f64| -> f64 { height - rd.gutter.bottom - (n - rd.y_axis_range.0) * y_scale })
             .collect::<Vec<f64>>();
             let x = rd.gutter.left + rd.box_plot_width / 2.0 + (i as f64 * rd.box_plot_width);
             let y_outliers: Vec<f64> = quartile

@@ -1,6 +1,6 @@
-use colored::Colorize;
-use core::fmt::Arguments;
 use box_plot_chart::{error, BoxPlotChartLog, BoxPlotChartTool};
+use core::fmt::Arguments;
+use yansi::Paint;
 
 struct BoxPlotChartLogger;
 
@@ -15,10 +15,10 @@ impl BoxPlotChartLog for BoxPlotChartLogger {
         println!("{}", args);
     }
     fn warning(self: &Self, args: Arguments) {
-        eprintln!("{}", format!("warning: {}", args).yellow());
+        eprintln!("{}", Paint::yellow(&format!("warning: {}", args)));
     }
     fn error(self: &Self, args: Arguments) {
-        eprintln!("{}", format!("error: {}", args).red());
+        eprintln!("{}", Paint::red(&format!("error: {}", args)));
     }
 }
 
